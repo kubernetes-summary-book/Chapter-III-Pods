@@ -185,12 +185,62 @@ Events:
 ### Saludo de los contenedores
 
 Kubernetes usa tres tipos de chequeos para saber si un contenedor tiene problemas o está bien:
-    
-    - `livenessProbe`: Si este chequeo falla, kubectl mala al contendor.
-    
+    - `livenessProbe`: Si este chequeo falla, kubectl mata al contendor.
     - `readinessProbe`: Este chequeo le dice a kubectl si el contenedor está listo para recibir paticiones.
-   
-    - `startupProbe`:
+    - `startupProbe`: Esta chequeo aparecio en la version 1.20. Esta opción surgio después de que aplicaciones con un tiempo de arraque que minutos en vez de milisegundos empezarón a usar Docker. `Este tipo de chequeo está pensado para aplicaciones pesadas o que son lentas a la hora de arrancar`.
+
+    Los chequeos de salud pueden estar en tres estados: Success, Failure o Unknown.
+
+  **Ecisten forma para definir estos chequeos:**
+      - **exec**: Ejecutando un comando dentro del contenedor.
+      - **httpGet**: Hacer peticion a una url del contenedor.
+      - **tcpSocket**: Hacer una conexión TCP al puerto indicado.
+      - **grpc**: El contenedor debe implementar un chequeo de salud definido por gRPC.
+
+**Ejemplo de contenedor con** `probe`.
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: liveness-pod
+spec:
+  containers:
+    - name: liveness
+      image: busybox
+      args:
+        - /bin/sh
+        - -c
+        - touch /tmp/healthy; sleep 10; rm -rf /tmp/healthy; sleep 200
+      livenessProbe:
+        exec:
+          command:
+            - cat
+            - /tmp/healthy
+        initialDelaySeconds: 5
+        periodSeconds: 5
+```
+
+En este ejemplo, se ha definido un contenedor, que cunado se arranque, ejecutará el siguiente comando:
+  - `touch /tmp/healthy; sleep 10; rm -rf /tmp/healthy; sleep 200` lo que hará es crear el fichero **/tmb/healthy** y **hará una pausa de 10 segundos** y vuelve a borrar el mismo y hace una pausa de 200 segundos.
+  
+`probe` de tipo `livenessProbe` (Si falla lo vuelve a levantar) ejecuta el comando `cat /tmp/healthy` cada 5 segundos (periodSeconds) y ejecuta el primer chequeo 5 segundos (initialDelaySeconds) después de que el contenedor se haya arrancado. 
+
+Minetras el fichero `/tmp/healthy` y el usuario es de tipo `Root`funcionará sin problema, de lo contrario, el estado del contenedor cambia a `Failure` y kubectl lo reiniciará, ya que **probe == livenessProbe**
+
+```bash
+kubectl get pods --watch
+````
+
+```bash
+youneskabiri@Youness-MacBook-Pro ~ % kubectl get pods --watch
+  NAME           READY   STATUS             RESTARTS       AGE
+  liveness-pod   0/1     CrashLoopBackOff   7 (3m2s ago)   14m
+  liveness-pod   1/1     Running            8 (33m ago)    44m
+  liveness-pod   1/1     Running            9 (8s ago)     155m
+  liveness-pod   1/1     Running            10 (3s ago)    171m
+  liveness-pod   0/1     CrashLoopBackOff   10 (1s ago)    171m
+````
+
 
 
 ###
